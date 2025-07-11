@@ -163,7 +163,7 @@ export default function Home() {
         return;
       }
 
-      const aliasMatch = token.match(/<alias[^>]*Key=['"]([^'"]+)['"][^>]*\/>/);
+      const aliasMatch = token.match(/<alias[^>]*Name=['"]([^'"]+)['"][^>]*\/>/);
       if (aliasMatch) {
         parts.push(
           <span
@@ -191,7 +191,7 @@ export default function Home() {
         return;
       }
 
-      const openFont = token.match(/<FontStyle[^>]*Type=['"]([^'"]+)['"][^>]*>/);
+      const openFont = token.match(/<FontStyle[^>]*name=['"]([^'"]+)['"][^>]*>/);
       if (openFont) {
         fontStack.push(openFont[1]);
         return;
