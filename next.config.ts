@@ -4,7 +4,7 @@ const nextConfig = {
   experimental: {
     appDir: true,
   },
-  output: 'standalone', // ← 이거 추가
+  output: 'standalone', // ✅ 이 줄 추가
 };
 
 export default nextConfig;
