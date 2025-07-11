@@ -53,11 +53,11 @@ export default function Home() {
       }
 
       const emptyTagPatterns = [
-        /<param\b[^<>]*?\/>(?!\s*>)/g,
-        /<alias\b[^<>]*?\/>(?!\s*>)/g,
+        /<param\b[^<>]*?\/>/g,
+        /<alias\b[^<>]*?\/>/g,
         /<PlayerName\s*\/>/g,
-        /<Icon[^>]*?\/>(?!\s*>)/g,
-        /<cms[^>]*?\/>(?!\s*>)/g
+        /<Icon[^>]*?\/>/g,
+        /<cms[^>]*?\/>/g
       ];
 
       emptyTagPatterns.forEach((regex) => {
@@ -85,7 +85,7 @@ export default function Home() {
     if (!matches) return text;
 
     const fontStack: string[] = [];
-    
+
     matches.forEach((token, i) => {
       if (token === "\\n") {
         parts.push(<br key={i} />);
@@ -128,6 +128,7 @@ export default function Home() {
           <kbd
             key={i}
             className="inline-block bg-black text-white text-sm px-2 py-0.5 rounded border border-gray-400 mx-0.5"
+            title="e.g., key, button, icon"
           >
             {label}
           </kbd>
@@ -141,6 +142,7 @@ export default function Home() {
           <span
             key={i}
             className="inline-block bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded mx-0.5 text-sm"
+            title="name, value"
           >
             {`{${paramMatch[1]}}`}
           </span>
@@ -153,6 +155,7 @@ export default function Home() {
           <span
             key={i}
             className="inline-block bg-purple-200 text-purple-800 px-2 py-0.5 rounded mx-0.5 text-sm"
+            title="player name"
           >
             플레이어
           </span>
@@ -163,7 +166,11 @@ export default function Home() {
       const aliasMatch = token.match(/<alias[^>]*Key=['"]([^'"]+)['"][^>]*\/>/);
       if (aliasMatch) {
         parts.push(
-          <span key={i} className="text-blue-700 font-medium mx-0.5">
+          <span
+            key={i}
+            className="text-blue-700 font-medium mx-0.5"
+            title="alias name"
+          >
             {aliasMatch[1]}
           </span>
         );
@@ -176,6 +183,7 @@ export default function Home() {
           <span
             key={i}
             className="inline-block bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded mx-0.5 text-sm font-semibold border border-yellow-300"
+            title="quest name, system term"
           >
             「{cmsMatch[1]}」
           </span>
@@ -197,6 +205,7 @@ export default function Home() {
       let className = "";
       if (fontStack.includes("Bold")) className += " font-bold";
       if (fontStack.includes("Red")) className += " text-red-600";
+      if (fontStack.includes("grade_rare")) className += " text-indigo-600 font-semibold";
       parts.push(<span key={i} className={className}>{token}</span>);
     });
 
@@ -227,7 +236,12 @@ export default function Home() {
             줄바꿈 표시
           </label>
         </div>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded shadow">
+        <button
+          className="bg-blue-600 text-white px-4 py-2 rounded shadow"
+          onClick={() => {
+            navigator.clipboard.writeText(targetText);
+          }}
+        >
           전체 복사
         </button>
       </div>
