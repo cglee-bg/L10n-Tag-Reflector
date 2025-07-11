@@ -84,8 +84,8 @@ export default function Home() {
     const matches = text.match(regex);
     if (!matches) return text;
 
-    let fontStack: string[] = [];
-
+    const fontStack: string[] = [];
+    
     matches.forEach((token, i) => {
       if (token === "\\n") {
         parts.push(<br key={i} />);
