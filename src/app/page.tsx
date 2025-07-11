@@ -29,7 +29,7 @@ function SourceEditor({ value, onChange }: { value: string; onChange: (val: stri
     return () => view.destroy();
   }, []);
 
-  return <div ref={editorRef} className="border rounded shadow-sm bg-white h-40 overflow-auto" />;
+  return <div ref={editorRef} className="border rounded shadow bg-white h-40 overflow-auto" />;
 }
 
 export default function Home() {
@@ -127,7 +127,7 @@ export default function Home() {
         parts.push(
           <kbd
             key={i}
-            className="inline-block bg-black text-white text-sm px-2 py-0.5 rounded border border-gray-400 mx-0.5"
+            className="inline-block bg-gray-900 text-white text-sm px-2 py-0.5 rounded border border-gray-300 mx-0.5 shadow-sm"
             title="e.g., key, button, icon"
           >
             {label}
@@ -141,7 +141,7 @@ export default function Home() {
         parts.push(
           <span
             key={i}
-            className="inline-block bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded mx-0.5 text-sm"
+            className="inline-block bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded mx-0.5 text-sm border border-gray-300"
             title="name, value"
           >
             {`{${paramMatch[1]}}`}
@@ -154,7 +154,7 @@ export default function Home() {
         parts.push(
           <span
             key={i}
-            className="inline-block bg-purple-200 text-purple-800 px-2 py-0.5 rounded mx-0.5 text-sm"
+            className="inline-block bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded mx-0.5 text-sm"
             title="player name"
           >
             플레이어
@@ -168,7 +168,7 @@ export default function Home() {
         parts.push(
           <span
             key={i}
-            className="text-blue-700 font-medium mx-0.5"
+            className="text-blue-600 font-medium mx-0.5"
             title="alias name"
           >
             {aliasMatch[1]}
@@ -182,7 +182,7 @@ export default function Home() {
         parts.push(
           <span
             key={i}
-            className="inline-block bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded mx-0.5 text-sm font-semibold border border-yellow-300"
+            className="inline-block bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded mx-0.5 text-sm font-medium border border-yellow-300"
             title="quest name, system term"
           >
             「{cmsMatch[1]}」
@@ -218,10 +218,11 @@ export default function Home() {
     ));
 
   return (
-    <main className="p-8 bg-gray-100 min-h-screen text-gray-800">
+    <main className="p-8 bg-[#f8f9fa] min-h-screen text-gray-900">
+      <title>BG Reflector</title>
       <div className="mb-4 flex items-center justify-between">
         <div className="space-x-4">
-          <select className="border rounded px-2 py-1">
+          <select className="border rounded px-2 py-1 bg-white shadow-sm">
             <option>ArcheAge</option>
             <option>MIR4</option>
           </select>
@@ -237,7 +238,7 @@ export default function Home() {
           </label>
         </div>
         <button
-          className="bg-blue-600 text-white px-4 py-2 rounded shadow"
+          className="bg-[#1a73e8] text-white px-4 py-2 rounded shadow hover:bg-[#1967d2]"
           onClick={() => {
             navigator.clipboard.writeText(targetText);
           }}
