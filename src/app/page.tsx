@@ -84,7 +84,7 @@ function findIconTagIssues(source: string, target: string): string[] {
   return errors;
 }
 
-function renderParsedText(text: string, showHidden: boolean): React.ReactNode {
+function renderParsedText(text: string, showHidden: boolean, showWidthRule: boolean): React.ReactNode {
   const parts: React.ReactNode[] = [];
   const regex = /<[^>]+>|[^<]+/g;
   const matches = text.match(regex);
@@ -121,7 +121,15 @@ function renderParsedText(text: string, showHidden: boolean): React.ReactNode {
       const visible = showHidden
         ? token.replace(/ /g, "␣").replace(/\t/g, "→").replace(/\r/g, "␍").replace(/\n/g, "␊")
         : token;
-      parts.push(<span key={i}>{visible}</span>);
+      const rendered = showWidthRule
+        ? Array.from(visible).map((char, j) => {
+            const isHalf = /[0-9\[\]\(\)\{\}〈〉《》〔〕\+\-]/.test(char);
+            const isFull = /[、。！？：；「」『』【】]/.test(char);
+            const className = isFull ? "text-green-600 font-bold" : isHalf ? "text-blue-600" : "";
+            return <span key={`${i}-${j}`} className={className}>{char}</span>;
+          })
+        : visible;
+      parts.push(<span key={i}>{rendered}</span>);
     }
   });
 
@@ -133,6 +141,7 @@ export default function Home() {
   const [targetText, setTargetText] = useState("");
   const [showLineBreaks, setShowLineBreaks] = useState(false);
   const [showHiddenChars, setShowHiddenChars] = useState(false);
+  const [showCharWidth, setShowCharWidth] = useState(false);
   const [sourceErrors, setSourceErrors] = useState<string[]>([]);
   const [targetErrors, setTargetErrors] = useState<string[]>([]);
 
@@ -145,7 +154,7 @@ export default function Home() {
 
   const renderText = (text: string) =>
     text.split(/\r?\n/).map((line, idx) => (
-      <div key={idx}>{renderParsedText(line, showHiddenChars)}</div>
+      <div key={idx}>{renderParsedText(line, showHiddenChars, showCharWidth)}</div>
     ));
 
   return (
@@ -176,6 +185,16 @@ export default function Home() {
               className="mr-1"
             />
             공백/개행 문자 표시
+          </label>
+
+          <label className="ml-4">
+            <input
+              type="checkbox"
+              checked={showCharWidth}
+              onChange={(e) => setShowCharWidth(e.target.checked)}
+              className="mr-1"
+            />
+            Character Width Rules 적용
           </label>
         </div>
         <button
