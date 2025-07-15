@@ -66,31 +66,43 @@ function validateText(text: string): string[] {
   return errors;
 }
 
+function parseIconAttributes(tag: string): Record<string, string> {
+  const attrRegex = /([\w-]+)=['"]([^'"]+)['"]/g;
+  const attrs: Record<string, string> = {};
+  let match;
+  while ((match = attrRegex.exec(tag)) !== null) {
+    attrs[match[1]] = match[2];
+  }
+  return attrs;
+}
+
 function findIconTagIssues(source: string, target: string): string[] {
   const errors: string[] = [];
 
   const iconTagRegex = /<Icon[^>]*?\/>/g;
-  const invalidIconTagRegex = /<Icon[^>]*[^/]>/g;
-
   const sourceIcons: string[] = source.match(iconTagRegex) || [];
-  const targetTags: string[] = target.match(iconTagRegex) || [];
-  const invalidTargetIcons: string[] = target.match(invalidIconTagRegex) || [];
+  const targetIcons: string[] = target.match(iconTagRegex) || [];
 
   sourceIcons.forEach((tag) => {
-    const tagStr = tag;
-    const exactMatch = targetTags.includes(tagStr);
-    const likelyBroken =
-      targetTags.some((t) => t.startsWith(tagStr.slice(0, -2)) && !t.endsWith("/>"));
-
-    if (!exactMatch && !likelyBroken) {
-      const lineNum = source.split("\n").findIndex((line) => line.includes(tagStr)) + 1;
-      errors.push(`${lineNum}줄: 타겟에서 <Icon ... /> 누락됨 → ${tagStr}`);
+    const attrs = parseIconAttributes(tag);
+    const hasKey = attrs["KeyAction"] || attrs["UIKeySpecificIconId"];
+    if (!hasKey) {
+      const lineNum = source.split("\n").findIndex((line) => line.includes(tag)) + 1;
+      errors.push(`${lineNum}줄: <Icon> 태그에 KeyAction 또는 UIKeySpecificIconId 속성이 없음 → ${tag}`);
     }
-  });
 
-  invalidTargetIcons.forEach((tag) => {
-    const lineNum = target.split("\n").findIndex((line) => line.includes(tag)) + 1;
-    errors.push(`${lineNum}줄: 잘못된 형식의 <Icon> 태그 감지 → ${tag}`);
+    const existsInTarget = targetIcons.some((t) => {
+      const tgtAttrs = parseIconAttributes(t);
+      return (
+        tgtAttrs["KeyAction"] === attrs["KeyAction"] ||
+        tgtAttrs["UIKeySpecificIconId"] === attrs["UIKeySpecificIconId"]
+      );
+    });
+
+    if (!existsInTarget) {
+      const lineNum = source.split("\n").findIndex((line) => line.includes(tag)) + 1;
+      errors.push(`${lineNum}줄: 타겟에서 유사한 <Icon> 태그 누락됨 → ${tag}`);
+    }
   });
 
   return errors;
