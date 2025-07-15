@@ -84,10 +84,55 @@ function findIconTagIssues(source: string, target: string): string[] {
   return errors;
 }
 
+function renderParsedText(text: string, showHidden: boolean): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  const regex = /<[^>]+>|[^<]+/g;
+  const matches = text.match(regex);
+
+  if (!matches) return text;
+
+  matches.forEach((token, i) => {
+    if (token.startsWith("<Icon")) {
+      const keyMatch = token.match(/KeyAction=['"]([^'"]+)['"]?/);
+      const idMatch = token.match(/UIKeySpecificIconId=['"]([^'"]+)['"]?/);
+      const iconKeyMap: Record<string, string> = {
+        WeaponSkill_Slot_Basic: "Z",
+        WeaponSkill_Slot_Smite: "X",
+        WeaponSkill_Slot_Dodge: "C",
+        WeaponSkill_Slot_Defence: "V",
+        "101": "Z",
+        "103": "X",
+      };
+      const label = keyMatch
+        ? iconKeyMap[keyMatch[1]] ?? "?"
+        : idMatch
+        ? iconKeyMap[idMatch[1]] ?? "?"
+        : "?";
+
+      parts.push(
+        <kbd
+          key={i}
+          className="inline-block bg-gray-900 text-white text-sm px-2 py-0.5 rounded border border-gray-300 mx-0.5 shadow-sm"
+        >
+          {label}
+        </kbd>
+      );
+    } else {
+      const visible = showHidden
+        ? token.replace(/ /g, "␣").replace(/\t/g, "→").replace(/\r/g, "␍").replace(/\n/g, "␊")
+        : token;
+      parts.push(<span key={i}>{visible}</span>);
+    }
+  });
+
+  return parts;
+}
+
 export default function Home() {
   const [sourceText, setSourceText] = useState("");
   const [targetText, setTargetText] = useState("");
   const [showLineBreaks, setShowLineBreaks] = useState(false);
+  const [showHiddenChars, setShowHiddenChars] = useState(false);
   const [sourceErrors, setSourceErrors] = useState<string[]>([]);
   const [targetErrors, setTargetErrors] = useState<string[]>([]);
 
@@ -99,7 +144,9 @@ export default function Home() {
   }, [sourceText, targetText]);
 
   const renderText = (text: string) =>
-    text.split(/\r?\n/).map((line, idx) => <div key={idx}>{line}</div>);
+    text.split(/\r?\n/).map((line, idx) => (
+      <div key={idx}>{renderParsedText(line, showHiddenChars)}</div>
+    ));
 
   return (
     <main className="p-8 bg-[#f8f9fa] min-h-screen text-gray-900">
@@ -119,6 +166,16 @@ export default function Home() {
               className="mr-1"
             />
             줄바꿈 표시
+          </label>
+
+          <label className="ml-4">
+            <input
+              type="checkbox"
+              checked={showHiddenChars}
+              onChange={(e) => setShowHiddenChars(e.target.checked)}
+              className="mr-1"
+            />
+            공백/개행 문자 표시
           </label>
         </div>
         <button
