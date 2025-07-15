@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import React from "react";
+import Head from "next/head";
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { html } from "@codemirror/lang-html";
@@ -34,7 +35,7 @@ function SourceEditor({ value, onChange }: { value: string; onChange: (val: stri
   return <div ref={editorRef} className="border rounded shadow bg-white h-40 overflow-auto" />;
 }
 
-const tagPatterns = [
+const tagPatterns: RegExp[] = [
   /\\n/g,
   /\\r/g,
   /<param\b[^<>]*?\/>/g,
@@ -54,8 +55,9 @@ const tagPatterns = [
 function countTags(text: string, regex: RegExp): Record<string, number> {
   const counts: Record<string, number> = {};
   const matches = text.match(regex) || [];
-  matches.forEach(tag => {
-    counts[tag] = (counts[tag] || 0) + 1;
+  matches.forEach((tag) => {
+    const key = tag as string;
+    counts[key] = (counts[key] || 0) + 1;
   });
   return counts;
 }
@@ -65,12 +67,13 @@ function compareTags(source: string, target: string, regex: RegExp): string[] {
   const targetTags = target.match(regex) || [];
   const errors: string[] = [];
 
-  sourceTags.forEach(tag => {
-    const exactMatch = targetTags.includes(tag);
-    const likelyBroken = targetTags.some(t => t.startsWith(tag.slice(0, -2)) && !t.endsWith("/>"));
+  sourceTags.forEach((tag) => {
+    const tagStr = tag as string;
+    const exactMatch = targetTags.includes(tagStr);
+    const likelyBroken = targetTags.some((t) => t.startsWith(tagStr.slice(0, -2)) && !t.endsWith("/>"));
     if (!exactMatch && !likelyBroken) {
-      const lineNum = source.split("\n").findIndex(line => line.includes(tag)) + 1;
-      errors.push(`${lineNum}줄: 타겟에서 누락 또는 훼손된 태그 감지 → ${tag}`);
+      const lineNum = source.split("\n").findIndex((line) => line.includes(tagStr)) + 1;
+      errors.push(`${lineNum}줄: 타겟에서 누락 또는 훼손된 태그 감지 → ${tagStr}`);
     }
   });
   return errors;
@@ -86,14 +89,15 @@ export default function Home() {
   useEffect(() => {
     const mismatchReport: string[] = [];
 
-    tagPatterns.forEach((regex) => {
+    tagPatterns.forEach((regex: RegExp) => {
       const sourceCount = countTags(sourceText, regex);
       const targetCount = countTags(targetText, regex);
-      Object.keys(sourceCount).forEach((tag: string) => {
-        const srcNum = sourceCount[tag];
-        const tgtNum = targetCount[tag] || 0;
+      Object.keys(sourceCount).forEach((tag) => {
+        const tagStr = tag as string;
+        const srcNum = sourceCount[tagStr];
+        const tgtNum = targetCount[tagStr] || 0;
         if (srcNum !== tgtNum) {
-          mismatchReport.push(`🔸 ${tag} — 소스 ${srcNum}개 / 타겟 ${tgtNum}개`);
+          mismatchReport.push(`🔸 ${tagStr} — 소스 ${srcNum}개 / 타겟 ${tgtNum}개`);
         }
       });
     });
@@ -107,54 +111,58 @@ export default function Home() {
   }, [sourceText, targetText]);
 
   return (
-    <main className="p-8 bg-[#121212] min-h-screen text-gray-100">
-      <title>BG Reflector</title>
-      <div className="mb-4 flex items-center justify-between">
-        <div className="space-x-4">
-          <select className="border rounded px-2 py-1 bg-[#2a2a2a] text-white">
-            <option>ArcheAge</option>
-            <option>MIR4</option>
-          </select>
+    <>
+      <Head>
+        <title>BG Reflector</title>
+      </Head>
+      <main className="p-8 bg-[#121212] min-h-screen text-gray-100">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="space-x-4">
+            <select className="border rounded px-2 py-1 bg-[#2a2a2a] text-white">
+              <option>ArcheAge</option>
+              <option>MIR4</option>
+            </select>
 
-          <label className="ml-4">
-            <input
-              type="checkbox"
-              checked={showLineBreaks}
-              onChange={(e) => setShowLineBreaks(e.target.checked)}
-              className="mr-1"
-            />
-            줄바꿈 표시
-          </label>
+            <label className="ml-4">
+              <input
+                type="checkbox"
+                checked={showLineBreaks}
+                onChange={(e) => setShowLineBreaks(e.target.checked)}
+                className="mr-1"
+              />
+              줄바꿈 표시
+            </label>
+          </div>
+          <button
+            className="bg-[#1a73e8] text-white px-4 py-2 rounded shadow hover:bg-[#1967d2]"
+            onClick={() => navigator.clipboard.writeText(targetText)}
+          >
+            전체 복사
+          </button>
         </div>
-        <button
-          className="bg-[#1a73e8] text-white px-4 py-2 rounded shadow hover:bg-[#1967d2]"
-          onClick={() => navigator.clipboard.writeText(targetText)}
-        >
-          전체 복사
-        </button>
-      </div>
 
-      <div className="grid grid-cols-2 gap-6 mb-2">
-        <div>
-          <label className="font-bold">🟥 소스 입력</label>
-          <SourceEditor value={sourceText} onChange={setSourceText} />
+        <div className="grid grid-cols-2 gap-6 mb-2">
+          <div>
+            <label className="font-bold">🟥 소스 입력</label>
+            <SourceEditor value={sourceText} onChange={setSourceText} />
+          </div>
+          <div>
+            <label className="font-bold">🟦 타겟 입력</label>
+            <SourceEditor value={targetText} onChange={setTargetText} />
+          </div>
         </div>
-        <div>
-          <label className="font-bold">🟦 타겟 입력</label>
-          <SourceEditor value={targetText} onChange={setTargetText} />
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 gap-6 mb-4 text-sm text-red-400">
-        <ul>
-          {targetErrors.length > 0 && <li className="font-bold mb-1">❗ 누락 또는 훼손된 태그:</li>}
-          {targetErrors.map((e, idx) => <li key={idx}>• {e}</li>)}
-        </ul>
-        <ul>
-          {tagSummary.length > 0 && <li className="font-bold mb-1">🔍 태그 카운트 요약:</li>}
-          {tagSummary.map((e, idx) => <li key={idx}>• {e}</li>)}
-        </ul>
-      </div>
-    </main>
+        <div className="grid grid-cols-1 gap-6 mb-4 text-sm text-red-400">
+          <ul>
+            {targetErrors.length > 0 && <li className="font-bold mb-1">❗ 누락 또는 훼손된 태그:</li>}
+            {targetErrors.map((e, idx) => <li key={idx}>• {e}</li>)}
+          </ul>
+          <ul>
+            {tagSummary.length > 0 && <li className="font-bold mb-1">🔍 태그 카운트 요약:</li>}
+            {tagSummary.map((e, idx) => <li key={idx}>• {e}</li>)}
+          </ul>
+        </div>
+      </main>
+    </>
   );
 }
