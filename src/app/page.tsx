@@ -10,28 +10,26 @@ import { html } from "@codemirror/lang-html";
 function SourceEditor({ value, onChange }: { value: string; onChange: (val: string) => void }) {
   const editorRef = useRef<HTMLDivElement>(null);
 
-  // useEffect 내부
-useEffect(() => {
-  if (!editorRef.current) return;
+  useEffect(() => {
+    if (!editorRef.current) return;
 
-  const updateListener = EditorView.updateListener.of((update) => {
-    if (update.docChanged) {
-      onChange(update.state.doc.toString());
-    }
-  });
+    const updateListener = EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        onChange(update.state.doc.toString());
+      }
+    });
 
-  const view = new EditorView({
-    state: EditorState.create({
-      doc: value,
-      extensions: [basicSetup, html(), updateListener],
-    }),
-    parent: editorRef.current,
-  });
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: value,
+        extensions: [basicSetup, html(), updateListener],
+      }),
+      parent: editorRef.current,
+    });
 
-  return () => view.destroy();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
-
+    return () => view.destroy();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return <div ref={editorRef} className="border rounded shadow bg-white h-40 overflow-auto" />;
 }
@@ -82,13 +80,10 @@ export default function Home() {
   const [sourceText, setSourceText] = useState("");
   const [targetText, setTargetText] = useState("");
   const [showLineBreaks, setShowLineBreaks] = useState(false);
-  const [sourceErrors, setSourceErrors] = useState<string[]>([]);
   const [targetErrors, setTargetErrors] = useState<string[]>([]);
   const [tagSummary, setTagSummary] = useState<string[]>([]);
 
   useEffect(() => {
-    const sourceTagReport: string[] = [];
-    const targetTagReport: string[] = [];
     const mismatchReport: string[] = [];
 
     tagPatterns.forEach((regex) => {
@@ -107,7 +102,6 @@ export default function Home() {
       ...compareTags(sourceText, targetText, /<Icon[^>]*?\/>/g),
     ];
 
-    setSourceErrors([]);
     setTargetErrors(combinedErrors);
     setTagSummary(mismatchReport);
   }, [sourceText, targetText]);
