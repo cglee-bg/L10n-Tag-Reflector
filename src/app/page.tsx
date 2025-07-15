@@ -1,3 +1,4 @@
+// Enhanced version of BG Reflector (page.tsx)
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -32,197 +33,88 @@ function SourceEditor({ value, onChange }: { value: string; onChange: (val: stri
   return <div ref={editorRef} className="border rounded shadow bg-white h-40 overflow-auto" />;
 }
 
+const tagPatterns = [
+  /\\n/g,
+  /\\r/g,
+  /<param\b[^<>]*?\/>/g,
+  /<alias\b[^<>]*?\/>/g,
+  /%Y/g,
+  /%m/g,
+  /%d/g,
+  /%H/g,
+  /%M/g,
+  /<PlayerName\s*\/>/g,
+  /<Icon[^>]*?\/>/g,
+  /<cms[^>]*?\/>/g,
+  /<FontStyle[^>]*?>/g,
+  /<\/FontStyle>/g
+];
+
+function countTags(text: string, regex: RegExp): Record<string, number> {
+  const counts: Record<string, number> = {};
+  const matches = text.match(regex) || [];
+  matches.forEach(tag => {
+    counts[tag] = (counts[tag] || 0) + 1;
+  });
+  return counts;
+}
+
+function compareTags(source: string, target: string, regex: RegExp): string[] {
+  const sourceTags = source.match(regex) || [];
+  const targetTags = target.match(regex) || [];
+  const errors: string[] = [];
+
+  sourceTags.forEach(tag => {
+    const exactMatch = targetTags.includes(tag);
+    const likelyBroken = targetTags.some(t => t.startsWith(tag.slice(0, -2)) && !t.endsWith("/>"));
+    if (!exactMatch && !likelyBroken) {
+      const lineNum = source.split("\n").findIndex(line => line.includes(tag)) + 1;
+      errors.push(`${lineNum}줄: 타겟에서 누락 또는 훼손된 태그 감지 → ${tag}`);
+    }
+  });
+  return errors;
+}
+
 export default function Home() {
   const [sourceText, setSourceText] = useState("");
   const [targetText, setTargetText] = useState("");
   const [showLineBreaks, setShowLineBreaks] = useState(false);
   const [sourceErrors, setSourceErrors] = useState<string[]>([]);
   const [targetErrors, setTargetErrors] = useState<string[]>([]);
+  const [tagSummary, setTagSummary] = useState<string[]>([]);
 
-  const validateText = (text: string): string[] => {
-    const lines = text.split("\n");
-    const errors: string[] = [];
+  useEffect(() => {
+    const sourceTagReport: string[] = [];
+    const targetTagReport: string[] = [];
+    const mismatchReport: string[] = [];
 
-    lines.forEach((line, index) => {
-      const lineNum = index + 1;
-
-      const openTags = (line.match(/<FontStyle[^>]*?>/g) || []).length;
-      const closeTags = (line.match(/<\/FontStyle>/g) || []).length;
-      if (openTags !== closeTags) {
-        errors.push(`${lineNum}줄: <FontStyle> 태그 쌍이 맞지 않음`);
-      }
-
-      const emptyTagPatterns = [
-        /<param\b[^<>]*?\/>/g,
-        /<alias\b[^<>]*?\/>/g,
-        /<PlayerName\s*\/>/g,
-        /<Icon[^>]*?\/>/g,
-        /<cms[^>]*?\/>/g
-      ];
-
-      emptyTagPatterns.forEach((regex) => {
-        const matches = line.match(regex) || [];
-        matches.forEach((tag) => {
-          if (!/\/\s*>$/.test(tag)) {
-            errors.push(`${lineNum}줄: 닫히지 않은 태그 감지됨 → ${tag}`);
-          }
-        });
+    tagPatterns.forEach((regex) => {
+      const sourceCount = countTags(sourceText, regex);
+      const targetCount = countTags(targetText, regex);
+      Object.keys(sourceCount).forEach(tag => {
+        const srcNum = sourceCount[tag];
+        const tgtNum = targetCount[tag] || 0;
+        if (srcNum !== tgtNum) {
+          mismatchReport.push(`🔸 ${tag} — 소스 ${srcNum}개 / 타겟 ${tgtNum}개`);
+        }
       });
     });
 
-    return errors;
-  };
+    const combinedErrors = [
+      ...compareTags(sourceText, targetText, /<Icon[^>]*?\/>/g),
+    ];
 
-  useEffect(() => {
-    setSourceErrors(validateText(sourceText));
-    setTargetErrors(validateText(targetText));
+    setSourceErrors([]);
+    setTargetErrors(combinedErrors);
+    setTagSummary(mismatchReport);
   }, [sourceText, targetText]);
 
-  const renderParsedText = (text: string): React.ReactNode => {
-    const parts: React.ReactNode[] = [];
-    const regex = /<[^>]+>|%[YmdHM]|\\r|\\n|[^<%\\r\\n]+/g;
-    const matches = text.match(regex);
-    if (!matches) return text;
-
-    const fontStack: string[] = [];
-
-    matches.forEach((token, i) => {
-      if (token === "\\n") {
-        parts.push(<br key={i} />);
-        return;
-      }
-
-      const dateMap: Record<string, string> = {
-        "%Y": "2025",
-        "%m": "07",
-        "%d": "11",
-        "%H": "14",
-        "%M": "30",
-      };
-      if (token in dateMap) {
-        parts.push(<span key={i}>{dateMap[token]}</span>);
-        return;
-      }
-
-      const keyMatch = token.match(/KeyAction=['"]([^'"]+)['"]?/);
-      const idMatch = token.match(/UIKeySpecificIconId=['"]([^'"]+)['"]?/);
-      if (token.startsWith("<Icon")) {
-        const iconKeyMap: Record<string, string> = {
-          WeaponSkill_Slot_Basic: "Z",
-          WeaponSkill_Slot_Smite: "X",
-          WeaponSkill_Slot_Dodge: "C",
-          WeaponSkill_Slot_Defence: "V",
-        };
-        const iconIdMap: Record<string, string> = {
-          "101": "Z",
-          "103": "X",
-        };
-
-        const label = keyMatch
-          ? iconKeyMap[keyMatch[1]] ?? "?"
-          : idMatch
-          ? iconIdMap[idMatch[1]] ?? "?"
-          : "?";
-
-        parts.push(
-          <kbd
-            key={i}
-            className="inline-block bg-gray-900 text-white text-sm px-2 py-0.5 rounded border border-gray-300 mx-0.5 shadow-sm"
-            title="e.g., key, button, icon"
-          >
-            {label}
-          </kbd>
-        );
-        return;
-      }
-
-      const paramMatch = token.match(/<param[^>]*Name=['"]([^'"]+)['"][^>]*\/>/);
-      if (paramMatch) {
-        parts.push(
-          <span
-            key={i}
-            className="inline-block bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded mx-0.5 text-sm border border-gray-300"
-            title="name, value"
-          >
-            {`{${paramMatch[1]}}`}
-          </span>
-        );
-        return;
-      }
-
-      if (token.match(/<PlayerName\s*\/>/)) {
-        parts.push(
-          <span
-            key={i}
-            className="inline-block bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded mx-0.5 text-sm"
-            title="player name"
-          >
-            플레이어
-          </span>
-        );
-        return;
-      }
-
-      const aliasMatch = token.match(/<alias[^>]*Name=['"]([^'"]+)['"][^>]*\/>/);
-      if (aliasMatch) {
-        parts.push(
-          <span
-            key={i}
-            className="text-blue-600 font-medium mx-0.5"
-            title="alias name"
-          >
-            {aliasMatch[1]}
-          </span>
-        );
-        return;
-      }
-
-      const cmsMatch = token.match(/<cms[^>]*Name=['"]([^'"]+)['"][^>]*\/>/);
-      if (cmsMatch) {
-        parts.push(
-          <span
-            key={i}
-            className="inline-block bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded mx-0.5 text-sm font-medium border border-yellow-300"
-            title="quest name, system term"
-          >
-            「{cmsMatch[1]}」
-          </span>
-        );
-        return;
-      }
-
-      const openFont = token.match(/<FontStyle[^>]*name=['"]([^'"]+)['"][^>]*>/);
-      if (openFont) {
-        fontStack.push(openFont[1]);
-        return;
-      }
-
-      if (token === "</FontStyle>") {
-        fontStack.pop();
-        return;
-      }
-
-      let className = "";
-      if (fontStack.includes("Bold")) className += " font-bold";
-      if (fontStack.includes("Red")) className += " text-red-600";
-      if (fontStack.includes("grade_rare")) className += " text-indigo-600 font-semibold";
-      parts.push(<span key={i} className={className}>{token}</span>);
-    });
-
-    return parts;
-  };
-
-  const renderText = (text: string) =>
-    text.split(/\r?\n/).map((line, idx) => (
-      <div key={idx}>{renderParsedText(line)}</div>
-    ));
-
   return (
-    <main className="p-8 bg-[#f8f9fa] min-h-screen text-gray-900">
+    <main className="p-8 bg-[#121212] min-h-screen text-gray-100">
       <title>BG Reflector</title>
       <div className="mb-4 flex items-center justify-between">
         <div className="space-x-4">
-          <select className="border rounded px-2 py-1 bg-white shadow-sm">
+          <select className="border rounded px-2 py-1 bg-[#2a2a2a] text-white">
             <option>ArcheAge</option>
             <option>MIR4</option>
           </select>
@@ -239,9 +131,7 @@ export default function Home() {
         </div>
         <button
           className="bg-[#1a73e8] text-white px-4 py-2 rounded shadow hover:bg-[#1967d2]"
-          onClick={() => {
-            navigator.clipboard.writeText(targetText);
-          }}
+          onClick={() => navigator.clipboard.writeText(targetText)}
         >
           전체 복사
         </button>
@@ -249,35 +139,24 @@ export default function Home() {
 
       <div className="grid grid-cols-2 gap-6 mb-2">
         <div>
-          <label className="font-bold">🟥 소스 입력 ({sourceText.split("\n").length}줄)</label>
+          <label className="font-bold">🟥 소스 입력</label>
           <SourceEditor value={sourceText} onChange={setSourceText} />
         </div>
         <div>
-          <label className="font-bold">🟦 타겟 입력 ({targetText.split("\n").length}줄)</label>
+          <label className="font-bold">🟦 타겟 입력</label>
           <SourceEditor value={targetText} onChange={setTargetText} />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6 mb-4 text-sm text-red-600">
+      <div className="grid grid-cols-1 gap-6 mb-4 text-sm text-red-400">
         <ul>
-          {sourceErrors.length > 0 && <li className="font-bold mb-1">소스 유효성 오류:</li>}
-          {sourceErrors.map((e, idx) => <li key={idx}>• {e}</li>)}
-        </ul>
-        <ul>
-          {targetErrors.length > 0 && <li className="font-bold mb-1">타겟 유효성 오류:</li>}
+          {targetErrors.length > 0 && <li className="font-bold mb-1">❗ 누락 또는 훼손된 태그:</li>}
           {targetErrors.map((e, idx) => <li key={idx}>• {e}</li>)}
         </ul>
-      </div>
-
-      <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white border border-gray-300 rounded-lg p-4 shadow-sm min-h-[120px]">
-          <div className="text-sm text-gray-500 mb-1">소스 미리보기</div>
-          <div>{renderText(sourceText)}</div>
-        </div>
-        <div className="bg-white border border-gray-300 rounded-lg p-4 shadow-sm min-h-[120px]">
-          <div className="text-sm text-gray-500 mb-1">타겟 미리보기</div>
-          <div>{renderText(targetText)}</div>
-        </div>
+        <ul>
+          {tagSummary.length > 0 && <li className="font-bold mb-1">🔍 태그 카운트 요약:</li>}
+          {tagSummary.map((e, idx) => <li key={idx}>• {e}</li>)}
+        </ul>
       </div>
     </main>
   );
