@@ -27,7 +27,7 @@ function SourceEditor({ value, onChange }: { value: string; onChange: (val: stri
     });
 
     return () => view.destroy();
-  }, []);
+  }, [value, onChange]);
 
   return <div ref={editorRef} className="border rounded shadow bg-white h-40 overflow-auto" />;
 }
@@ -66,16 +66,6 @@ function validateText(text: string): string[] {
   return errors;
 }
 
-function parseIconAttributes(tag: string): Record<string, string> {
-  const attrRegex = /([\w-]+)=['"]([^'"]+)['"]/g;
-  const attrs: Record<string, string> = {};
-  let match;
-  while ((match = attrRegex.exec(tag)) !== null) {
-    attrs[match[1]] = match[2];
-  }
-  return attrs;
-}
-
 function findIconTagIssues(source: string, target: string): string[] {
   const errors: string[] = [];
 
@@ -85,10 +75,9 @@ function findIconTagIssues(source: string, target: string): string[] {
 
   sourceIcons.forEach((sourceTag) => {
     const lineNum = source.split("\n").findIndex((line) => line.includes(sourceTag)) + 1;
-
-    const exactMatch = targetIcons.includes(sourceTag);
-    if (!exactMatch) {
-      errors.push(`${lineNum}줄: 타겟에서 동일한 <Icon> 태그 누락 또는 훼손됨 → ${sourceTag}`);
+    const matched = targetIcons.includes(sourceTag);
+    if (!matched) {
+      errors.push(`${lineNum}줄: 타겟에서 정확히 일치하는 <Icon> 태그 누락 또는 변형됨 → ${sourceTag}`);
     }
   });
 
