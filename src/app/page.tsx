@@ -1,9 +1,7 @@
-// Enhanced version of BG Reflector (page.tsx)
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import React from "react";
-import Head from "next/head";
 import { EditorView, basicSetup } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { html } from "@codemirror/lang-html";
@@ -29,53 +27,72 @@ function SourceEditor({ value, onChange }: { value: string; onChange: (val: stri
     });
 
     return () => view.destroy();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return <div ref={editorRef} className="border rounded shadow bg-white h-40 overflow-auto" />;
 }
 
-const tagPatterns: RegExp[] = [
-  /\\n/g,
-  /\\r/g,
-  /<param\b[^<>]*?\/>/g,
-  /<alias\b[^<>]*?\/>/g,
-  /%Y/g,
-  /%m/g,
-  /%d/g,
-  /%H/g,
-  /%M/g,
-  /<PlayerName\s*\/>/g,
-  /<Icon[^>]*?\/>/g,
-  /<cms[^>]*?\/>/g,
-  /<FontStyle[^>]*?>/g,
-  /<\/FontStyle>/g
-];
-
-function countTags(text: string, regex: RegExp): Record<string, number> {
-  const counts: Record<string, number> = {};
-  const matches = text.match(regex) || [];
-  matches.forEach((tag) => {
-    const key = tag as string;
-    counts[key] = (counts[key] || 0) + 1;
-  });
-  return counts;
-}
-
-function compareTags(source: string, target: string, regex: RegExp): string[] {
-  const sourceTags = source.match(regex) || [];
-  const targetTags = target.match(regex) || [];
+function validateText(text: string): string[] {
+  const lines = text.split("\n");
   const errors: string[] = [];
 
-  sourceTags.forEach((tag) => {
-    const tagStr = tag as string;
+  lines.forEach((line, index) => {
+    const lineNum = index + 1;
+
+    const openTags = (line.match(/<FontStyle[^>]*?>/g) || []).length;
+    const closeTags = (line.match(/<\/FontStyle>/g) || []).length;
+    if (openTags !== closeTags) {
+      errors.push(`${lineNum}줄: <FontStyle> 태그 쌍이 맞지 않음`);
+    }
+
+    const emptyTagPatterns = [
+      /<param\b[^<>]*?\/>/g,
+      /<alias\b[^<>]*?\/>/g,
+      /<PlayerName\s*\/>/g,
+      /<Icon[^>]*?\/>/g,
+      /<cms[^>]*?\/>/g
+    ];
+
+    emptyTagPatterns.forEach((regex) => {
+      const matches = line.match(regex) || [];
+      matches.forEach((tag) => {
+        if (!/\/\s*>$/.test(tag)) {
+          errors.push(`${lineNum}줄: 닫히지 않은 태그 감지됨 → ${tag}`);
+        }
+      });
+    });
+  });
+
+  return errors;
+}
+
+function findIconTagIssues(source: string, target: string): string[] {
+  const errors: string[] = [];
+
+  const iconTagRegex = /<Icon[^>]*?\/>/g;
+  const invalidIconTagRegex = /<Icon[^>]*[^/]>/g;
+
+  const sourceIcons: string[] = source.match(iconTagRegex) || [];
+  const targetTags: string[] = target.match(iconTagRegex) || [];
+  const invalidTargetIcons: string[] = target.match(invalidIconTagRegex) || [];
+
+  sourceIcons.forEach((tag) => {
+    const tagStr = tag;
     const exactMatch = targetTags.includes(tagStr);
-    const likelyBroken = targetTags.some((t) => t.startsWith(tagStr.slice(0, -2)) && !t.endsWith("/>"));
+    const likelyBroken =
+      targetTags.some((t) => t.startsWith(tagStr.slice(0, -2)) && !t.endsWith("/>"));
+
     if (!exactMatch && !likelyBroken) {
       const lineNum = source.split("\n").findIndex((line) => line.includes(tagStr)) + 1;
-      errors.push(`${lineNum}줄: 타겟에서 누락 또는 훼손된 태그 감지 → ${tagStr}`);
+      errors.push(`${lineNum}줄: 타겟에서 <Icon ... /> 누락됨 → ${tagStr}`);
     }
   });
+
+  invalidTargetIcons.forEach((tag) => {
+    const lineNum = target.split("\n").findIndex((line) => line.includes(tag)) + 1;
+    errors.push(`${lineNum}줄: 잘못된 형식의 <Icon> 태그 감지 → ${tag}`);
+  });
+
   return errors;
 }
 
@@ -83,86 +100,81 @@ export default function Home() {
   const [sourceText, setSourceText] = useState("");
   const [targetText, setTargetText] = useState("");
   const [showLineBreaks, setShowLineBreaks] = useState(false);
+  const [sourceErrors, setSourceErrors] = useState<string[]>([]);
   const [targetErrors, setTargetErrors] = useState<string[]>([]);
-  const [tagSummary, setTagSummary] = useState<string[]>([]);
 
   useEffect(() => {
-    const mismatchReport: string[] = [];
-
-    tagPatterns.forEach((regex: RegExp) => {
-      const sourceCount = countTags(sourceText, regex);
-      const targetCount = countTags(targetText, regex);
-      Object.keys(sourceCount).forEach((tag) => {
-        const tagStr = tag as string;
-        const srcNum = sourceCount[tagStr];
-        const tgtNum = targetCount[tagStr] || 0;
-        if (srcNum !== tgtNum) {
-          mismatchReport.push(`🔸 ${tagStr} — 소스 ${srcNum}개 / 타겟 ${tgtNum}개`);
-        }
-      });
-    });
-
-    const combinedErrors = [
-      ...compareTags(sourceText, targetText, /<Icon[^>]*?\/>/g),
-    ];
-
-    setTargetErrors(combinedErrors);
-    setTagSummary(mismatchReport);
+    setSourceErrors(validateText(sourceText));
+    const baseErrors = validateText(targetText);
+    const iconIssues = findIconTagIssues(sourceText, targetText);
+    setTargetErrors([...baseErrors, ...iconIssues]);
   }, [sourceText, targetText]);
 
+  const renderText = (text: string) =>
+    text.split(/\r?\n/).map((line, idx) => <div key={idx}>{line}</div>);
+
   return (
-    <>
-      <Head>
-        <title>BG Reflector</title>
-      </Head>
-      <main className="p-8 bg-[#121212] min-h-screen text-gray-100">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="space-x-4">
-            <select className="border rounded px-2 py-1 bg-[#2a2a2a] text-white">
-              <option>ArcheAge</option>
-              <option>MIR4</option>
-            </select>
+    <main className="p-8 bg-[#f8f9fa] min-h-screen text-gray-900">
+      <title>BG Reflector</title>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="space-x-4">
+          <select className="border rounded px-2 py-1 bg-white shadow-sm">
+            <option>ArcheAge</option>
+            <option>MIR4</option>
+          </select>
 
-            <label className="ml-4">
-              <input
-                type="checkbox"
-                checked={showLineBreaks}
-                onChange={(e) => setShowLineBreaks(e.target.checked)}
-                className="mr-1"
-              />
-              줄바꿈 표시
-            </label>
-          </div>
-          <button
-            className="bg-[#1a73e8] text-white px-4 py-2 rounded shadow hover:bg-[#1967d2]"
-            onClick={() => navigator.clipboard.writeText(targetText)}
-          >
-            전체 복사
-          </button>
+          <label className="ml-4">
+            <input
+              type="checkbox"
+              checked={showLineBreaks}
+              onChange={(e) => setShowLineBreaks(e.target.checked)}
+              className="mr-1"
+            />
+            줄바꿈 표시
+          </label>
         </div>
+        <button
+          className="bg-[#1a73e8] text-white px-4 py-2 rounded shadow hover:bg-[#1967d2]"
+          onClick={() => {
+            navigator.clipboard.writeText(targetText);
+          }}
+        >
+          전체 복사
+        </button>
+      </div>
 
-        <div className="grid grid-cols-2 gap-6 mb-2">
-          <div>
-            <label className="font-bold">🟥 소스 입력</label>
-            <SourceEditor value={sourceText} onChange={setSourceText} />
-          </div>
-          <div>
-            <label className="font-bold">🟦 타겟 입력</label>
-            <SourceEditor value={targetText} onChange={setTargetText} />
-          </div>
+      <div className="grid grid-cols-2 gap-6 mb-2">
+        <div>
+          <label className="font-bold">🟥 소스 입력 ({sourceText.split("\n").length}줄)</label>
+          <SourceEditor value={sourceText} onChange={setSourceText} />
         </div>
+        <div>
+          <label className="font-bold">🟦 타겟 입력 ({targetText.split("\n").length}줄)</label>
+          <SourceEditor value={targetText} onChange={setTargetText} />
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1 gap-6 mb-4 text-sm text-red-400">
-          <ul>
-            {targetErrors.length > 0 && <li className="font-bold mb-1">❗ 누락 또는 훼손된 태그:</li>}
-            {targetErrors.map((e, idx) => <li key={idx}>• {e}</li>)}
-          </ul>
-          <ul>
-            {tagSummary.length > 0 && <li className="font-bold mb-1">🔍 태그 카운트 요약:</li>}
-            {tagSummary.map((e, idx) => <li key={idx}>• {e}</li>)}
-          </ul>
+      <div className="grid grid-cols-2 gap-6 mb-4 text-sm text-red-600">
+        <ul>
+          {sourceErrors.length > 0 && <li className="font-bold mb-1">소스 유효성 오류:</li>}
+          {sourceErrors.map((e, idx) => <li key={idx}>• {e}</li>)}
+        </ul>
+        <ul>
+          {targetErrors.length > 0 && <li className="font-bold mb-1">타겟 유효성 오류:</li>}
+          {targetErrors.map((e, idx) => <li key={idx}>• {e}</li>)}
+        </ul>
+      </div>
+
+      <div className="grid grid-cols-2 gap-6">
+        <div className="bg-white border border-gray-300 rounded-lg p-4 shadow-sm min-h-[120px]">
+          <div className="text-sm text-gray-500 mb-1">소스 미리보기</div>
+          <div>{renderText(sourceText)}</div>
         </div>
-      </main>
-    </>
+        <div className="bg-white border border-gray-300 rounded-lg p-4 shadow-sm min-h-[120px]">
+          <div className="text-sm text-gray-500 mb-1">타겟 미리보기</div>
+          <div>{renderText(targetText)}</div>
+        </div>
+      </div>
+    </main>
   );
 }
