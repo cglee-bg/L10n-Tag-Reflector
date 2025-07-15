@@ -83,25 +83,12 @@ function findIconTagIssues(source: string, target: string): string[] {
   const sourceIcons: string[] = source.match(iconTagRegex) || [];
   const targetIcons: string[] = target.match(iconTagRegex) || [];
 
-  sourceIcons.forEach((tag) => {
-    const attrs = parseIconAttributes(tag);
-    const hasKey = attrs["KeyAction"] || attrs["UIKeySpecificIconId"];
-    if (!hasKey) {
-      const lineNum = source.split("\n").findIndex((line) => line.includes(tag)) + 1;
-      errors.push(`${lineNum}줄: <Icon> 태그에 KeyAction 또는 UIKeySpecificIconId 속성이 없음 → ${tag}`);
-    }
+  sourceIcons.forEach((sourceTag) => {
+    const lineNum = source.split("\n").findIndex((line) => line.includes(sourceTag)) + 1;
 
-    const existsInTarget = targetIcons.some((t) => {
-      const tgtAttrs = parseIconAttributes(t);
-      return (
-        tgtAttrs["KeyAction"] === attrs["KeyAction"] ||
-        tgtAttrs["UIKeySpecificIconId"] === attrs["UIKeySpecificIconId"]
-      );
-    });
-
-    if (!existsInTarget) {
-      const lineNum = source.split("\n").findIndex((line) => line.includes(tag)) + 1;
-      errors.push(`${lineNum}줄: 타겟에서 유사한 <Icon> 태그 누락됨 → ${tag}`);
+    const exactMatch = targetIcons.includes(sourceTag);
+    if (!exactMatch) {
+      errors.push(`${lineNum}줄: 타겟에서 동일한 <Icon> 태그 누락 또는 훼손됨 → ${sourceTag}`);
     }
   });
 
