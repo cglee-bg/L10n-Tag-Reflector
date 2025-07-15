@@ -156,6 +156,7 @@ export default function Home() {
   const [showCharWidth, setShowCharWidth] = useState(false);
   const [sourceErrors, setSourceErrors] = useState<string[]>([]);
   const [targetErrors, setTargetErrors] = useState<string[]>([]);
+  const [showHelp, setShowHelp] = useState(true);
 
   useEffect(() => {
     setSourceErrors(validateText(sourceText));
@@ -172,6 +173,26 @@ export default function Home() {
   return (
     <main className="p-8 bg-[#f8f9fa] min-h-screen text-gray-900">
       <title>BG Reflector</title>
+
+      {showHelp && (
+        <div className="mb-6 p-4 border-l-4 border-blue-600 bg-blue-50 text-sm text-blue-900 rounded">
+          <div className="flex justify-between items-start">
+            <div>
+              <strong>🔎 BG Reflector 사용 가이드</strong><br />
+              - 왼쪽에 원문(소스), 오른쪽에 번역문(타겟)을 붙여넣어 주세요.<br />
+              - 태그 유효성 검사와 키 시각화가 자동 적용됩니다.<br />
+              - 상단 체크박스를 통해 공백/개행, 문자폭 시각화도 가능합니다.
+            </div>
+            <button
+              onClick={() => setShowHelp(false)}
+              className="ml-4 text-blue-700 text-xs hover:underline"
+            >
+              닫기 ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mb-4 flex items-center justify-between">
         <div className="space-x-4">
           <select className="border rounded px-2 py-1 bg-white shadow-sm">
