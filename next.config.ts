@@ -1,10 +1,9 @@
+// next.config.ts
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
   experimental: {
-    appDir: true,
+    // ❌ appDir: true, → 이 줄 삭제
   },
-  output: 'standalone', // ✅ 이 줄 추가
 };
 
 export default nextConfig;
