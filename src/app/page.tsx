@@ -56,7 +56,7 @@ function validateText(text: string): string[] {
     emptyTagPatterns.forEach((regex) => {
       const matches = line.match(regex) || [];
       matches.forEach((tag) => {
-        if (!/\/\s*>$/.test(tag)) {
+        if (!/<[^<>]+\/>$/.test(tag)) {
           errors.push(`${lineNum}줄: 닫히지 않은 태그 감지됨 → ${tag}`);
         }
       });
@@ -68,7 +68,6 @@ function validateText(text: string): string[] {
 
 function findIconTagIssues(source: string, target: string): string[] {
   const errors: string[] = [];
-
   const iconTagRegex = /<Icon[^>]*?\/>/g;
   const sourceIcons: string[] = source.match(iconTagRegex) || [];
   const targetIcons: string[] = target.match(iconTagRegex) || [];
@@ -88,7 +87,6 @@ function renderParsedText(text: string, showHidden: boolean, showWidthRule: bool
   const parts: React.ReactNode[] = [];
   const regex = /<[^>]+>|[^<]+/g;
   const matches = text.match(regex);
-
   if (!matches) return text;
 
   matches.forEach((token, i) => {
@@ -112,6 +110,7 @@ function renderParsedText(text: string, showHidden: boolean, showWidthRule: bool
       parts.push(
         <kbd
           key={i}
+          title={keyMatch?.[1] || idMatch?.[1] || ""}
           className="inline-block bg-gray-900 text-white text-sm px-2 py-0.5 rounded border border-gray-300 mx-0.5 shadow-sm"
         >
           {label}
@@ -125,8 +124,21 @@ function renderParsedText(text: string, showHidden: boolean, showWidthRule: bool
         ? Array.from(visible).map((char, j) => {
             const isHalf = /[0-9\[\]\(\)\{\}〈〉《》〔〕\+\-]/.test(char);
             const isFull = /[、。！？：；「」『』【】]/.test(char);
-            const className = isFull ? "text-green-600 font-bold" : isHalf ? "text-blue-600" : "";
-            return <span key={`${i}-${j}`} className={className}>{char}</span>;
+            const style = isFull
+              ? "bg-green-100 text-green-700 font-semibold px-0.5 rounded-sm"
+              : isHalf
+              ? "bg-blue-100 text-blue-700 px-0.5 rounded-sm"
+              : "";
+            const tooltip = isFull
+              ? "전각 문자 (Full-width)"
+              : isHalf
+              ? "반각 문자 (Half-width)"
+              : "";
+            return (
+              <span key={`${i}-${j}`} className={style} title={tooltip}>
+                {char}
+              </span>
+            );
           })
         : visible;
       parts.push(<span key={i}>{rendered}</span>);
