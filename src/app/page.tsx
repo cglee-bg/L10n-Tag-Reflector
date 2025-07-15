@@ -10,25 +10,28 @@ import { html } from "@codemirror/lang-html";
 function SourceEditor({ value, onChange }: { value: string; onChange: (val: string) => void }) {
   const editorRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!editorRef.current) return;
+  // useEffect 내부
+useEffect(() => {
+  if (!editorRef.current) return;
 
-    const updateListener = EditorView.updateListener.of((update) => {
-      if (update.docChanged) {
-        onChange(update.state.doc.toString());
-      }
-    });
+  const updateListener = EditorView.updateListener.of((update) => {
+    if (update.docChanged) {
+      onChange(update.state.doc.toString());
+    }
+  });
 
-    const view = new EditorView({
-      state: EditorState.create({
-        doc: value,
-        extensions: [basicSetup, html(), updateListener],
-      }),
-      parent: editorRef.current,
-    });
+  const view = new EditorView({
+    state: EditorState.create({
+      doc: value,
+      extensions: [basicSetup, html(), updateListener],
+    }),
+    parent: editorRef.current,
+  });
 
-    return () => view.destroy();
-  }, []);
+  return () => view.destroy();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
 
   return <div ref={editorRef} className="border rounded shadow bg-white h-40 overflow-auto" />;
 }
