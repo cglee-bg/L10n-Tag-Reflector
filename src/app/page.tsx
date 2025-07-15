@@ -27,134 +27,138 @@ function SourceEditor({ value, onChange }: { value: string; onChange: (val: stri
     });
 
     return () => view.destroy();
-  }, [value, onChange]);
+  }, []);
 
   return <div ref={editorRef} className="border rounded shadow bg-white h-40 overflow-auto" />;
-}
-
-function validateText(text: string): string[] {
-  const lines = text.split("\n");
-  const errors: string[] = [];
-
-  lines.forEach((line, index) => {
-    const lineNum = index + 1;
-
-    const openTags = (line.match(/<FontStyle[^>]*?>/g) || []).length;
-    const closeTags = (line.match(/<\/FontStyle>/g) || []).length;
-    if (openTags !== closeTags) {
-      errors.push(`${lineNum}줄: <FontStyle> 태그 쌍이 맞지 않음`);
-    }
-
-    const emptyTagPatterns = [
-      /<param\b[^<>]*?\/>/g,
-      /<alias\b[^<>]*?\/>/g,
-      /<PlayerName\s*\/>/g,
-      /<Icon[^>]*?\/>/g,
-      /<cms[^>]*?\/>/g
-    ];
-
-    emptyTagPatterns.forEach((regex) => {
-      const matches = line.match(regex) || [];
-      matches.forEach((tag) => {
-        if (!/\/\s*>$/.test(tag)) {
-          errors.push(`${lineNum}줄: 닫히지 않은 태그 감지됨 → ${tag}`);
-        }
-      });
-    });
-  });
-
-  return errors;
-}
-
-function findIconTagIssues(source: string, target: string): string[] {
-  const errors: string[] = [];
-
-  const iconTagRegex = /<Icon[^>]*?\/>/g;
-  const sourceIcons: string[] = source.match(iconTagRegex) || [];
-  const targetIcons: string[] = target.match(iconTagRegex) || [];
-
-  sourceIcons.forEach((sourceTag) => {
-    const lineNum = source.split("\n").findIndex((line) => line.includes(sourceTag)) + 1;
-    const matched = targetIcons.includes(sourceTag);
-    if (!matched) {
-      errors.push(`${lineNum}줄: 타겟에서 정확히 일치하는 <Icon> 태그 누락 또는 변형됨 → ${sourceTag}`);
-    }
-  });
-
-  return errors;
-}
-
-function renderParsedText(text: string, showHidden: boolean, showWidthRule: boolean): React.ReactNode {
-  const parts: React.ReactNode[] = [];
-  const regex = /<[^>]+>|[^<]+/g;
-  const matches = text.match(regex);
-
-  if (!matches) return text;
-
-  matches.forEach((token, i) => {
-    if (token.startsWith("<Icon")) {
-      const keyMatch = token.match(/KeyAction=['"]([^'"]+)['"]?/);
-      const idMatch = token.match(/UIKeySpecificIconId=['"]([^'"]+)['"]?/);
-      const iconKeyMap: Record<string, string> = {
-        WeaponSkill_Slot_Basic: "Z",
-        WeaponSkill_Slot_Smite: "X",
-        WeaponSkill_Slot_Dodge: "C",
-        WeaponSkill_Slot_Defence: "V",
-        "101": "Z",
-        "103": "X",
-      };
-      const label = keyMatch
-        ? iconKeyMap[keyMatch[1]] ?? "?"
-        : idMatch
-        ? iconKeyMap[idMatch[1]] ?? "?"
-        : "?";
-
-      parts.push(
-        <kbd
-          key={i}
-          className="inline-block bg-gray-900 text-white text-sm px-2 py-0.5 rounded border border-gray-300 mx-0.5 shadow-sm"
-        >
-          {label}
-        </kbd>
-      );
-    } else {
-      const visible = showHidden
-        ? token.replace(/ /g, "␣").replace(/\t/g, "→").replace(/\r/g, "␍").replace(/\n/g, "␊")
-        : token;
-      const rendered = showWidthRule
-        ? Array.from(visible).map((char, j) => {
-            const isHalf = /[0-9\[\]\(\)\{\}〈〉《》〔〕\+\-]/.test(char);
-            const isFull = /[、。！？：；「」『』【】]/.test(char);
-            const className = isFull ? "text-green-600 font-bold" : isHalf ? "text-blue-600" : "";
-            return <span key={`${i}-${j}`} className={className}>{char}</span>;
-          })
-        : visible;
-      parts.push(<span key={i}>{rendered}</span>);
-    }
-  });
-
-  return parts;
 }
 
 export default function Home() {
   const [sourceText, setSourceText] = useState("");
   const [targetText, setTargetText] = useState("");
   const [showLineBreaks, setShowLineBreaks] = useState(false);
-  const [showHiddenChars, setShowHiddenChars] = useState(false);
-  const [showCharWidth, setShowCharWidth] = useState(false);
+  const [showCharWidthRule, setShowCharWidthRule] = useState(false);
   const [sourceErrors, setSourceErrors] = useState<string[]>([]);
   const [targetErrors, setTargetErrors] = useState<string[]>([]);
 
+  const validateText = (text: string): string[] => {
+    const lines = text.split("\n");
+    const errors: string[] = [];
+
+    const iconTagRegex = /<Icon[^>]*?\/>/g;
+    const invalidIconTagRegex = /<Icon[^>]*[^/]>/g;
+
+    const sourceIcons: string[] = sourceText.match(iconTagRegex) || [];
+    const targetIcons: string[] = targetText.match(iconTagRegex) || [];
+    const invalidTargetIcons: string[] = targetText.match(invalidIconTagRegex) || [];
+
+    sourceIcons.forEach((tag) => {
+      const exactMatch = targetIcons.includes(tag);
+      if (!exactMatch) {
+        const lineNum = sourceText.split("\n").findIndex((line) => line.includes(tag)) + 1;
+        errors.push(`${lineNum}줄: 타겟에 누락되었거나 훼손된 태그 → ${tag}`);
+      }
+    });
+
+    invalidTargetIcons.forEach((tag) => {
+      const lineNum = targetText.split("\n").findIndex((line) => line.includes(tag)) + 1;
+      errors.push(`${lineNum}줄: 닫힘 없는 <Icon> 태그 감지 → ${tag}`);
+    });
+
+    return errors;
+  };
+
   useEffect(() => {
     setSourceErrors(validateText(sourceText));
-    const baseErrors = validateText(targetText);
-    const iconIssues = findIconTagIssues(sourceText, targetText);
-    setTargetErrors([...baseErrors, ...iconIssues]);
+    setTargetErrors(validateText(targetText));
   }, [sourceText, targetText]);
+
+  function highlightCharWidth(char: string, i: string | number) {
+    const fullWidthPunctuations = "、。！？：；「」『』【】";
+    const halfWidthNumbers = /[0-9]/;
+    const halfWidthParens = /[\[\]\(\)\{\}〈〉《》〔〕]/;
+    const halfWidthSymbols = /[+\-]/;
+
+    if (fullWidthPunctuations.includes(char)) {
+      return (
+        <span key={i} className="inline-block bg-green-100 text-green-800 font-bold px-1 rounded" title="전각 기호 (Full-width)">
+          {char}
+        </span>
+      );
+    } else if (halfWidthNumbers.test(char)) {
+      return (
+        <span key={i} className="inline-block bg-blue-100 text-blue-800 px-1 rounded" title="반각 숫자">
+          {char}
+        </span>
+      );
+    } else if (halfWidthParens.test(char)) {
+      return (
+        <span key={i} className="inline-block bg-purple-100 text-purple-800 px-1 rounded" title="반각 괄호">
+          {char}
+        </span>
+      );
+    } else if (halfWidthSymbols.test(char)) {
+      return (
+        <span key={i} className="inline-block bg-pink-100 text-pink-800 font-semibold px-1 rounded" title="반각 기호">
+          {char}
+        </span>
+      );
+    } else {
+      return <span key={i}>{char}</span>;
+    }
+  }
+
+  const renderParsedText = (text: string): React.ReactNode => {
+    const parts: React.ReactNode[] = [];
+    const regex = /<[^>]+>|[^<]+/g;
+    const matches = text.match(regex);
+    if (!matches) return text;
+
+    matches.forEach((token, i) => {
+      if (token.startsWith("<Icon")) {
+        const keyMatch = token.match(/KeyAction=['"]([^'"]+)['"]?/);
+        const idMatch = token.match(/UIKeySpecificIconId=['"]([^'"]+)['"]?/);
+        const iconKeyMap: Record<string, string> = {
+          WeaponSkill_Slot_Basic: "Z",
+          WeaponSkill_Slot_Smite: "X",
+          WeaponSkill_Slot_Dodge: "C",
+          WeaponSkill_Slot_Defence: "V",
+          "101": "Z",
+          "103": "X",
+        };
+
+        const label = keyMatch
+          ? iconKeyMap[keyMatch[1]] ?? "?"
+          : idMatch
+          ? iconKeyMap[idMatch[1]] ?? "?"
+          : "?";
+
+        parts.push(
+          <kbd
+            key={i}
+            className="inline-block bg-gray-900 text-white text-sm px-2 py-0.5 rounded border border-gray-300 mx-0.5 shadow-sm"
+            title="Icon Key"
+          >
+            {label}
+          </kbd>
+        );
+      } else {
+        const chars = token.split("");
+        chars.forEach((char, j) => {
+          if (showCharWidthRule) {
+            parts.push(highlightCharWidth(char, `${i}-${j}`));
+          } else {
+            parts.push(<span key={`${i}-${j}`}>{char}</span>);
+          }
+        });
+      }
+    });
+
+    return parts;
+  };
 
   const renderText = (text: string) =>
     text.split(/\r?\n/).map((line, idx) => (
-      <div key={idx}>{renderParsedText(line, showHiddenChars, showCharWidth)}</div>
+      <div key={idx}>{renderParsedText(line)}</div>
     ));
 
   return (
@@ -180,18 +184,8 @@ export default function Home() {
           <label className="ml-4">
             <input
               type="checkbox"
-              checked={showHiddenChars}
-              onChange={(e) => setShowHiddenChars(e.target.checked)}
-              className="mr-1"
-            />
-            공백/개행 문자 표시
-          </label>
-
-          <label className="ml-4">
-            <input
-              type="checkbox"
-              checked={showCharWidth}
-              onChange={(e) => setShowCharWidth(e.target.checked)}
+              checked={showCharWidthRule}
+              onChange={(e) => setShowCharWidthRule(e.target.checked)}
               className="mr-1"
             />
             Character Width Rules 적용
