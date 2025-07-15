@@ -89,7 +89,7 @@ export default function Home() {
     tagPatterns.forEach((regex) => {
       const sourceCount = countTags(sourceText, regex);
       const targetCount = countTags(targetText, regex);
-      Object.keys(sourceCount).forEach(tag => {
+      Object.keys(sourceCount).forEach((tag: string) => {
         const srcNum = sourceCount[tag];
         const tgtNum = targetCount[tag] || 0;
         if (srcNum !== tgtNum) {
